@@ -168,11 +168,9 @@ class Controller(Generic[Context]):
 		# Tab Management Actions
 		@self.registry.action('Switch tab', param_model=SwitchTabAction)
 		async def switch_tab(params: SwitchTabAction, browser: BrowserContext):
-			await browser.switch_to_tab(params.page_id)
-			# Wait for tab to be ready
-			page = await browser.get_current_page()
+			page = await browser.switch_to_tab(params.page_id)
 			await page.wait_for_load_state()
-			msg = f'🔄  Switched to tab {params.page_id}'
+			msg = f'🔄  Switched to tab {params.page_id}, current page url: {page.url}'
 			logger.info(msg)
 			return ActionResult(extracted_content=msg, include_in_memory=True)
 

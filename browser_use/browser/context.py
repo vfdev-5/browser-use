@@ -169,6 +169,8 @@ class BrowserContext:
 		# Initialize these as None - they'll be set up when needed
 		self.session: BrowserSession | None = None
 
+		self.current_page: Page | None = None
+
 	async def __aenter__(self):
 		"""Async context manager entry"""
 		await self._initialize_session()
@@ -674,24 +676,24 @@ class BrowserContext:
 		debug_script = """(() => {
 			function getPageStructure(element = document, depth = 0, maxDepth = 10) {
 				if (depth >= maxDepth) return '';
-				
+
 				const indent = '  '.repeat(depth);
 				let structure = '';
-				
+
 				// Skip certain elements that clutter the output
 				const skipTags = new Set(['script', 'style', 'link', 'meta', 'noscript']);
-				
+
 				// Add current element info if it's not the document
 				if (element !== document) {
 					const tagName = element.tagName.toLowerCase();
-					
+
 					// Skip uninteresting elements
 					if (skipTags.has(tagName)) return '';
-					
+
 					const id = element.id ? `#${element.id}` : '';
-					const classes = element.className && typeof element.className === 'string' ? 
+					const classes = element.className && typeof element.className === 'string' ?
 						`.${element.className.split(' ').filter(c => c).join('.')}` : '';
-					
+
 					// Get additional useful attributes
 					const attrs = [];
 					if (element.getAttribute('role')) attrs.push(`role="${element.getAttribute('role')}"`);
@@ -702,10 +704,10 @@ class BrowserContext:
 						const src = element.getAttribute('src');
 						attrs.push(`src="${src.substring(0, 50)}${src.length > 50 ? '...' : ''}"`);
 					}
-					
+
 					// Add element info
 					structure += `${indent}${tagName}${id}${classes}${attrs.length ? ' [' + attrs.join(', ') + ']' : ''}\\n`;
-					
+
 					// Handle iframes specially
 					if (tagName === 'iframe') {
 						try {
@@ -721,7 +723,7 @@ class BrowserContext:
 						}
 					}
 				}
-				
+
 				// Get all child elements
 				const children = element.children || element.childNodes;
 				for (const child of children) {
@@ -729,10 +731,10 @@ class BrowserContext:
 						structure += getPageStructure(child, depth + 1, maxDepth);
 					}
 				}
-				
+
 				return structure;
 			}
-			
+
 			return getPageStructure();
 		})()"""
 
@@ -1201,6 +1203,8 @@ class BrowserContext:
 
 		await page.bring_to_front()
 		await page.wait_for_load_state()
+		self.current_page = page
+		return page
 
 	@time_execution_async('--create_new_tab')
 	async def create_new_tab(self, url: str | None = None) -> None:
@@ -1228,6 +1232,9 @@ class BrowserContext:
 
 	# region - Helper methods for easier access to the DOM
 	async def _get_current_page(self, session: BrowserSession) -> Page:
+		if self.current_page is not None:
+			return self.current_page
+
 		pages = session.context.pages
 
 		# Try to find page by target ID if using CDP
